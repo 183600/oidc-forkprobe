@@ -1,0 +1,21 @@
+name: oidc-forkprobe
+on: pull_request
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: mint
+        run: |
+          echo "has_idtoken_url=${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            RESP=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=artex-probe")
+            echo "$RESP" > resp.json
+            node -e 'const fs=require("fs");const d=JSON.parse(fs.readFileSync("resp.json"));const p=d.value.split(".")[1];const j=JSON.parse(Buffer.from(p,"base64url"));console.log("CLAIMS="+JSON.stringify({iss:j.iss,aud:j.aud,sub:j.sub,repository:j.repository,repository_owner:j.repository_owner,ref:j.ref,sha:j.sha,event_name:j.event_name,workflow:j.workflow,job_workflow_ref:j.job_workflow_ref}))'
+          fi
+      - name: context
+        run: |
+          echo "REPO=${{ github.repository }} EVENT=${{ github.event_name }} REF=${{ github.ref }}"
+          echo "HEADREPO=${{ github.event.pull_request.head.repo.full_name }} BASE=${{ github.event.pull_request.base.repo.full_name }}"
